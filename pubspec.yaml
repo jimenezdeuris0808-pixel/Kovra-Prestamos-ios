@@ -1,0 +1,48 @@
+name: kovra_mobile
+description: "Kovra - App móvil de gestión de préstamos y cobranza en campo."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+
+  # Gestión de estado
+  flutter_riverpod: ^2.5.1
+
+  # Cliente HTTP
+  dio: ^5.4.3+1
+
+  # Almacenamiento seguro de sesión/token
+  flutter_secure_storage: ^9.2.2
+
+  # Compartir / imprimir recibo
+  share_plus: ^9.0.0
+
+  # Formateo de moneda y fecha
+  intl: ^0.19.0
+
+  # Render de logo SVG
+  flutter_svg: ^2.0.10+1
+
+  # Utilidades de colecciones (firstWhereOrNull, etc.)
+  collection: ^1.18.0
+
+  # Selector de imagen (logo de "Mi Empresa"), funciona en Flutter Web
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/logo_kovra_corporativo.svg
