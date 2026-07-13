@@ -40,5 +40,12 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # flutter_secure_storage (y potencialmente otros pods) traen su propio
+    # IPHONEOS_DEPLOYMENT_TARGET fijo en 9.0, por debajo del minimo que
+    # Xcode acepta hoy (12.0) -- forzamos aqui el mismo valor que ya declara
+    # `platform :ios, '13.0'` arriba, para cada pod individual.
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+    end
   end
 end
