@@ -26,12 +26,20 @@ workflows:
       - name: Instalar dependencias de Flutter
         script: flutter packages pub get
 
+      - name: Inicializar keychain para firma de codigo
+        script: keychain initialize
+
       - name: Configuracion de firma automatica (App Store Connect)
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-          xcode-project use-profiles
+
+      - name: Importar certificado al keychain
+        script: keychain add-certificates
+
+      - name: Aplicar perfiles de firma al proyecto Xcode
+        script: xcode-project use-profiles
 
       - name: Instalar CocoaPods
         script: |
