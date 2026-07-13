@@ -13,6 +13,8 @@ workflows:
     integrations:
       app_store_connect: kovra_app_store_connect
     environment:
+      groups:
+        - ios_signing
       flutter: stable
       xcode: latest
       cocoapods: default
