@@ -175,8 +175,8 @@ class _AdminTenantDetailScreenState
     final seleccionada = await showDatePicker(
       context: context,
       initialDate: fechaActual ?? DateTime.now(),
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      firstDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
+      lastDate: DateTime.now().add(const Duration(days: 365 * 100)),
     );
 
     if (seleccionada != null) {

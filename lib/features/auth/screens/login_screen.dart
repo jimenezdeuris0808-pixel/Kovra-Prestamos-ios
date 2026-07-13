@@ -5,7 +5,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/auth_card.dart';
 import '../../../shared/widgets/kovra_logo.dart';
 import '../../../shared/widgets/primary_button.dart';
-import '../../admin/screens/admin_login_screen.dart';
 import '../providers/auth_providers.dart';
 import 'signup_screen.dart';
 
@@ -115,31 +114,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       isLoading: state.isLoading,
                       onPressed: _submit,
                     ),
-                    footer: Column(
-                      children: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SignupScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text('¿No tienes cuenta? Crear cuenta'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AdminLoginScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text('Acceso administrador'),
-                        ),
-                      ],
+                    footer: TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SignupScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text('¿No tienes cuenta? Crear cuenta'),
                     ),
                   ),
                 ],

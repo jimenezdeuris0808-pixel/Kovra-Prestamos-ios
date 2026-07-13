@@ -154,3 +154,20 @@ final currentRncEmpresaProvider = FutureProvider<String?>((ref) async {
   final branding = await ref.read(authRepositoryProvider).obtenerBranding();
   return branding.rncCedula;
 });
+
+/// Aviso de vigencia (`GET /auth/me`) cuando al tenant le quedan pocos días
+/// de servicio o ya venció (dentro del período de gracia) -- `null` si no
+/// aplica. Mismo criterio que los providers de arriba: se pide en vivo cada
+/// vez, no se cachea en `SecureStorageService`, para que el aviso
+/// desaparezca/aparezca solo según pase el tiempo sin depender de un nuevo
+/// login. Si la petición falla (offline), no debe romper la pantalla
+/// principal -- se trata como "sin aviso" en vez de propagar el error.
+final avisoVigenciaProvider = FutureProvider<String?>((ref) async {
+  ref.watch(sessionControllerProvider);
+  try {
+    final branding = await ref.read(authRepositoryProvider).obtenerBranding();
+    return branding.avisoVigencia;
+  } catch (_) {
+    return null;
+  }
+});

@@ -9,6 +9,8 @@ class TenantBranding {
     this.tieneLogo = false,
     this.telefono,
     this.rncCedula,
+    this.fechaExpiracion,
+    this.avisoVigencia,
   });
 
   final String nombreEmpresa;
@@ -19,6 +21,14 @@ class TenantBranding {
   /// aparecen en la cabecera del recibo de pago junto al nombre/logo.
   final String? telefono;
   final String? rncCedula;
+
+  /// Fecha de expiración de la vigencia del tenant (`null` = indefinida).
+  final String? fechaExpiracion;
+
+  /// Mensaje de aviso de pago cuando faltan pocos días para vencer o ya
+  /// venció (dentro del período de gracia) -- `null` si no aplica todavía.
+  /// Ver `Kovra_API/app/business.py::mensaje_aviso_vigencia`.
+  final String? avisoVigencia;
 
   String get nombreParaMostrar =>
       (nombreComercial != null && nombreComercial!.trim().isNotEmpty)
@@ -32,6 +42,8 @@ class TenantBranding {
       tieneLogo: json['tiene_logo'] as bool? ?? false,
       telefono: json['telefono'] as String?,
       rncCedula: json['rnc_cedula'] as String?,
+      fechaExpiracion: json['fecha_expiracion'] as String?,
+      avisoVigencia: json['aviso_vigencia'] as String?,
     );
   }
 }

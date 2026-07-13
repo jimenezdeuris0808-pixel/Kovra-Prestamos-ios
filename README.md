@@ -14,10 +14,16 @@ pagos en línea.
 El base URL de la API se resuelve automáticamente en
 `lib/core/network/api_config.dart`:
 
-- Emulador Android: `http://10.0.2.2:8000`
-- iOS simulator / desktop: `http://localhost:8000`
-- Dispositivo físico: define `overrideBaseUrl` en ese archivo con la IP LAN
-  de tu backend (ej. `http://192.168.1.10:8000`).
+- Builds de **release** (`flutter build apk/ipa/appbundle`): siempre usan
+  `ApiConfig.productionBaseUrl` (HTTPS). Actualiza ese valor con la URL real
+  una vez que despliegues `Kovra_API` (ver `Kovra_API/fly.toml`).
+- Debug/profile, emulador Android: `http://10.0.2.2:8000`
+- Debug/profile, iOS simulator / desktop: `http://localhost:8000`
+- Debug/profile, dispositivo físico: pasa la IP LAN de tu backend por
+  `--dart-define`, nunca la hardcodees en el código:
+  ```bash
+  flutter run --dart-define=LAN_OVERRIDE_URL=http://192.168.1.10:8000
+  ```
 
 ## Primeros pasos
 

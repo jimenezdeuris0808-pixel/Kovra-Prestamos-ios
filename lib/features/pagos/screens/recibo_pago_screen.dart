@@ -1,6 +1,8 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:share_plus/share_plus.dart';
@@ -24,38 +26,48 @@ import '../../../shared/widgets/secondary_button.dart';
 /// del tenant logueado) -- NUNCA hardcodear "Kovra" acá: cada tenant tiene
 /// su propia empresa y ve sus propios recibos con su propio nombre.
 class ReciboPagoScreen extends ConsumerWidget {
-  const ReciboPagoScreen({super.key, required this.resultado});
+  ReciboPagoScreen({super.key, required this.resultado});
 
   final PagoResultado resultado;
 
-  String _textoRecibo(String nombreEmpresa) {
-    final buffer = StringBuffer()
-      ..writeln('$nombreEmpresa - Comprobante de Pago')
-      ..writeln('Folio: ${resultado.folio ?? '-'}')
-      ..writeln('Fecha: ${Formatters.dateTime(resultado.fecha)}')
-      ..writeln('Cliente: ${resultado.clienteNombre ?? '-'}')
-      ..writeln('Método de pago: ${resultado.metodo?.label ?? '-'}')
-      ..writeln('Monto pagado: ${Formatters.currency(resultado.montoTransaccion ?? resultado.montoPagado)}')
-      ..writeln('Mora: ${Formatters.currency(resultado.mora)}')
-      ..writeln('Estado de la cuota: ${resultado.estadoFactura}');
-    if (resultado.referencia != null && resultado.referencia!.isNotEmpty) {
-      buffer.writeln('Referencia: ${resultado.referencia}');
-    }
-    return buffer.toString();
+  /// Ancla el `RepaintBoundary` de [_ReciboCard] para poder capturarlo como
+  /// imagen al compartir/imprimir. Campo de instancia (no `const`) porque un
+  /// `GlobalKey` debe mantenerse estable mientras viva esta pantalla.
+  final GlobalKey _reciboKey = GlobalKey();
+
+  /// Renderiza el recibo (el `RepaintBoundary` marcado con [_reciboKey]) a
+  /// PNG en memoria. `pixelRatio: 3` para que se vea nítido al compartirlo a
+  /// tamaño completo en WhatsApp/galería, no solo del tamaño de pantalla.
+  Future<Uint8List> _capturarReciboComoImagen() async {
+    final boundary = _reciboKey.currentContext!.findRenderObject()
+        as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 3);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
   }
 
   Future<void> _compartir(String nombreEmpresa) async {
-    await Share.share(
-      _textoRecibo(nombreEmpresa),
+    final bytes = await _capturarReciboComoImagen();
+    final folio = resultado.folio ?? 'recibo';
+    await Share.shareXFiles(
+      [
+        XFile.fromData(
+          bytes,
+          name: 'recibo_$folio.png',
+          mimeType: 'image/png',
+        ),
+      ],
       subject: 'Comprobante de pago $nombreEmpresa',
+      text: 'Comprobante de pago $nombreEmpresa — Folio $folio',
     );
   }
 
   Future<void> _imprimir(BuildContext context, String nombreEmpresa) async {
     // Nota: la impresión real requiere integración con un servicio de
     // impresión térmica/PDF (ej. paquete `printing`), fuera del alcance de
-    // este MVP. Por ahora reutilizamos el flujo de compartir como acción
-    // equivalente para enviar el comprobante a una impresora vía sistema.
+    // este MVP. Por ahora reutilizamos el flujo de compartir (imagen del
+    // recibo) como acción equivalente para enviar el comprobante a una
+    // impresora vía sistema.
     await _compartir(nombreEmpresa);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,12 +149,15 @@ class ReciboPagoScreen extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),
-              _ReciboCard(
-                resultado: resultado,
-                nombreEmpresa: nombreEmpresa,
-                logo: logo,
-                telefono: telefono,
-                rncCedula: rncCedula,
+              RepaintBoundary(
+                key: _reciboKey,
+                child: _ReciboCard(
+                  resultado: resultado,
+                  nombreEmpresa: nombreEmpresa,
+                  logo: logo,
+                  telefono: telefono,
+                  rncCedula: rncCedula,
+                ),
               ),
               const SizedBox(height: AppSpacing.xxl),
               Row(

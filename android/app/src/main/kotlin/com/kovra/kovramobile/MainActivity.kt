@@ -1,4 +1,4 @@
-package com.kovra.mobile
+package com.kovra.kovramobile
 
 import io.flutter.embedding.android.FlutterActivity
 

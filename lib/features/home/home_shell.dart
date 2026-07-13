@@ -4,6 +4,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radii.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/clay_decoration.dart';
+import '../../shared/widgets/vigencia_banner.dart';
 import '../cobros/screens/cobros_hoy_screen.dart';
 import '../dashboard/screens/dashboard_screen.dart';
 import '../prestamos/screens/prestamos_cartera_screen.dart';
@@ -48,9 +49,18 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       backgroundColor: AppColors.backgroundClay,
       extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Column(
+        children: [
+          // Solo el banner necesita su propio SafeArea -- cada pantalla de
+          // _screens ya trae su propio Scaffold/SafeArea interno.
+          const SafeArea(bottom: false, child: VigenciaBanner()),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _screens,
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _FloatingPillNavBar(
         items: _items,
