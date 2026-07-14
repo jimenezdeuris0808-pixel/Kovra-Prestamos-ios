@@ -247,6 +247,18 @@ class _DatapresamoTile extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    if (item.fechaVencPendiente != null &&
+                        item.restante > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'desde ${Formatters.date(Formatters.parseDate(item.fechaVencPendiente))}',
+                        style: const TextStyle(
+                          color: AppColors.danger,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],

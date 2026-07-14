@@ -26,6 +26,7 @@ class PrestamoBusquedaItem {
     required this.diasAtraso,
     required this.puntuacionGlobal,
     required this.cuotasVencidasTotalesCliente,
+    this.fechaVencPendiente,
   });
 
   final String empresa;
@@ -45,6 +46,11 @@ class PrestamoBusquedaItem {
   final int diasAtraso;
   final int puntuacionGlobal;
   final int cuotasVencidasTotalesCliente;
+
+  /// Fecha de vencimiento de la cuota impaga más antigua de este préstamo
+  /// (`null` si no tiene ninguna pendiente) -- desde cuándo está pendiente
+  /// el monto de [restante].
+  final String? fechaVencPendiente;
 
   factory PrestamoBusquedaItem.fromJson(Map<String, dynamic> json) {
     return PrestamoBusquedaItem(
@@ -67,6 +73,7 @@ class PrestamoBusquedaItem {
       puntuacionGlobal: json['puntuacion_global'] as int? ?? 0,
       cuotasVencidasTotalesCliente:
           json['cuotas_vencidas_totales_cliente'] as int? ?? 0,
+      fechaVencPendiente: json['fecha_venc_pendiente']?.toString(),
     );
   }
 }
