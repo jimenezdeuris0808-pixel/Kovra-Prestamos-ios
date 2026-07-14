@@ -65,5 +65,7 @@
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Kovra necesita acceso a tus fotos para que puedas seleccionar el logo de tu empresa.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

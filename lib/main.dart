@@ -34,21 +34,27 @@ class KovraApp extends ConsumerWidget {
 }
 
 /// Enruta según el estado de sesión: si hay sesión activa muestra el
-/// HomeShell, de lo contrario Login. También reacciona a logout automático
-/// (401) forzando el retorno a Login desde cualquier pantalla apilada.
+/// HomeShell, de lo contrario Login.
+///
+/// Antes, además de este `if` reactivo, un `ref.listen` intentaba TAMBIÉN
+/// forzar el logout automático (401) con
+/// `Navigator.pushNamedAndRemoveUntil('/login', ...)` sobre el
+/// `rootNavigator` -- pero ese navigator es el mismo que contiene a
+/// `_RootRouter`, así que esa llamada reemplazaba la ruta que lo alberga
+/// (destruyéndolo) exactamente al mismo tiempo que este `build()` ya
+/// reconstruía y devolvía `LoginScreen()` por su cuenta. Las dos rutas en
+/// pugna dejaban la app atascada en la pantalla anterior (reportado: tras
+/// una sesión expirada -- token inválido por rotación del secreto JWT en el
+/// backend -- la app quedaba pegada en el error "El token expiró" sin poder
+/// volver al login). Basta con el `if` de abajo: al ser reactivo a
+/// `sessionControllerProvider`, ya muestra `LoginScreen` solo apenas la
+/// sesión se invalida, sin necesidad de ninguna navegación imperativa.
 class _RootRouter extends ConsumerWidget {
   const _RootRouter();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isAuthenticated = ref.watch(sessionControllerProvider);
-
-    ref.listen<bool>(sessionControllerProvider, (previous, next) {
-      if (previous == true && next == false) {
-        final navigator = Navigator.of(context, rootNavigator: true);
-        navigator.pushNamedAndRemoveUntil('/login', (route) => false);
-      }
-    });
 
     if (!isAuthenticated) {
       return const LoginScreen();
