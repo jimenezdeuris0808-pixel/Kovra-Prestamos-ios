@@ -11,6 +11,7 @@ class TenantBranding {
     this.rncCedula,
     this.fechaExpiracion,
     this.avisoVigencia,
+    this.aplicaMora = true,
   });
 
   final String nombreEmpresa;
@@ -30,6 +31,12 @@ class TenantBranding {
   /// Ver `Kovra_API/app/business.py::mensaje_aviso_vigencia`.
   final String? avisoVigencia;
 
+  /// Interruptor de "Mi Empresa": si es `false`, el backend nunca calcula
+  /// mora por atraso para NINGÚN préstamo de este tenant (ver
+  /// `Kovra_API/app/business.py::calcular_mora_factura`). Default `true`
+  /// para no cambiar el comportamiento de tenants existentes.
+  final bool aplicaMora;
+
   String get nombreParaMostrar =>
       (nombreComercial != null && nombreComercial!.trim().isNotEmpty)
           ? nombreComercial!
@@ -44,6 +51,7 @@ class TenantBranding {
       rncCedula: json['rnc_cedula'] as String?,
       fechaExpiracion: json['fecha_expiracion'] as String?,
       avisoVigencia: json['aviso_vigencia'] as String?,
+      aplicaMora: json['aplica_mora'] as bool? ?? true,
     );
   }
 }

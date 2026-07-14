@@ -136,7 +136,7 @@ class _MiEmpresaScreenState extends ConsumerState<MiEmpresaScreen> {
                   message: error.toString(),
                   onRetry: () => ref.invalidate(empresaBrandingProvider),
                 ),
-                data: (_) => SingleChildScrollView(
+                data: (branding) => SingleChildScrollView(
                   padding: const EdgeInsets.all(AppSpacing.lg),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -189,6 +189,8 @@ class _MiEmpresaScreenState extends ConsumerState<MiEmpresaScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: AppSpacing.lg),
+                      _AplicaMoraCard(aplicaMora: branding.aplicaMora),
                       if (state.errorMessage != null) ...[
                         const SizedBox(height: AppSpacing.md),
                         Row(
@@ -219,6 +221,75 @@ class _MiEmpresaScreenState extends ConsumerState<MiEmpresaScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Interruptor "Aplicar mora automática": activa/desactiva el cálculo de
+/// mora por atraso para TODOS los préstamos de la empresa. Guarda de
+/// inmediato al mover el switch (no espera al botón "Guardar cambios" de
+/// más abajo, que solo cubre nombre/teléfono/RNC).
+class _AplicaMoraCard extends ConsumerWidget {
+  const _AplicaMoraCard({required this.aplicaMora});
+
+  final bool aplicaMora;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(miEmpresaControllerProvider);
+    return ClayCard(
+      child: Row(
+        children: [
+          const Icon(Icons.percent_outlined, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Aplicar mora automática',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  aplicaMora
+                      ? 'Las cuotas atrasadas suman mora del 5% automáticamente.'
+                      : 'La mora está desactivada: las cuotas atrasadas no suman recargo.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: aplicaMora,
+            onChanged: state.isLoading
+                ? null
+                : (value) async {
+                    final controller =
+                        ref.read(miEmpresaControllerProvider.notifier);
+                    final ok = await controller.actualizarAplicaMora(value);
+                    if (ok && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            value
+                                ? 'Mora automática activada.'
+                                : 'Mora automática desactivada.',
+                          ),
+                        ),
+                      );
+                    }
+                  },
+          ),
+        ],
       ),
     );
   }

@@ -40,7 +40,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
 
     if (ok && mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      // No usar pushReplacementNamed('/home'): reemplazaria la unica ruta
+      // del stack, que hoy contiene `_RootRouter` (el widget reactivo que
+      // decide Login/HomeShell/AdminHomeScreen segun el estado de sesion y
+      // escucha logout automatico por 401, ver main.dart). Reemplazarla deja
+      // la app sin ese listener para el resto de la sesion. En su lugar,
+      // simplemente no navegamos: `_RootRouter` ya esta escuchando
+      // `sessionControllerProvider` y se reconstruye solo mostrando
+      // HomeShell apenas `submit()` deja la sesion autenticada.
     }
   }
 

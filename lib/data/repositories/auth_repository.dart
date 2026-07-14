@@ -93,6 +93,25 @@ class AuthRepository {
     throw AuthException(detail);
   }
 
+  /// Activa/desactiva el cálculo automático de mora por atraso para TODOS
+  /// los préstamos del tenant (`PUT /auth/aplica-mora`, interruptor de "Mi
+  /// Empresa"). Endpoint separado de [actualizarBranding] para que guardar
+  /// el resto del formulario nunca pueda pisar este valor por accidente.
+  Future<TenantBranding> actualizarAplicaMora(bool aplicaMora) async {
+    final response = await _dio.put(
+      '/auth/aplica-mora',
+      data: {'aplica_mora': aplicaMora},
+    );
+    if (response.statusCode == 200 && response.data is Map) {
+      return TenantBranding.fromJson(response.data as Map<String, dynamic>);
+    }
+    final detail = (response.data is Map)
+        ? (response.data['detail']?.toString() ??
+            'No se pudo actualizar el ajuste de mora.')
+        : 'No se pudo actualizar el ajuste de mora.';
+    throw AuthException(detail);
+  }
+
   /// Sube/reemplaza el logo de "Mi Empresa" (`POST /auth/logo`, multipart).
   Future<TenantBranding> subirLogo(Uint8List bytes, String filename) async {
     final response = await _dio.post(

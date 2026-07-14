@@ -42,7 +42,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         );
 
     if (ok && mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      // Igual que en LoginScreen: no usar pushReplacementNamed('/home').
+      // SignupScreen se apilo con Navigator.push encima de la ruta raiz que
+      // contiene `_RootRouter` -- basta con volver a esa ruta (pop) para que
+      // `_RootRouter`, ya reactivo a `sessionControllerProvider`, muestre
+      // HomeShell solo porque `submit()` ya dejo la sesion autenticada.
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
 

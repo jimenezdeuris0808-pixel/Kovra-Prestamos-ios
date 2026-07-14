@@ -61,6 +61,30 @@ class MiEmpresaController extends StateNotifier<MiEmpresaState> {
     }
   }
 
+  /// Activa/desactiva el cálculo automático de mora para todos los
+  /// préstamos del tenant. Endpoint separado de [guardar] (ver
+  /// `AuthRepository.actualizarAplicaMora`), así que se puede alternar sin
+  /// depender del resto del formulario de "Mi Empresa".
+  Future<bool> actualizarAplicaMora(bool aplicaMora) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final repo = _ref.read(authRepositoryProvider);
+      await repo.actualizarAplicaMora(aplicaMora);
+      _invalidarBrandingGlobal();
+      state = state.copyWith(isLoading: false);
+      return true;
+    } on AuthException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'No se pudo actualizar el ajuste de mora. Intenta de nuevo.',
+      );
+      return false;
+    }
+  }
+
   Future<bool> subirLogo(Uint8List bytes, String filename) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/providers/core_providers.dart';
@@ -46,20 +48,37 @@ class ReciboPagoScreen extends ConsumerWidget {
     return byteData!.buffer.asUint8List();
   }
 
-  Future<void> _compartir(String nombreEmpresa) async {
-    final bytes = await _capturarReciboComoImagen();
-    final folio = resultado.folio ?? 'recibo';
-    await Share.shareXFiles(
-      [
-        XFile.fromData(
-          bytes,
-          name: 'recibo_$folio.png',
-          mimeType: 'image/png',
-        ),
-      ],
-      subject: 'Comprobante de pago $nombreEmpresa',
-      text: 'Comprobante de pago $nombreEmpresa — Folio $folio',
-    );
+  /// Comparte el recibo como imagen.
+  ///
+  /// Antes usaba `XFile.fromData` (bytes en memoria, sin archivo real en
+  /// disco) -- en iOS el share sheet nativo de `share_plus` no siempre
+  /// resuelve ese tipo de `XFile` correctamente, y como la excepción no se
+  /// capturaba, el botón "no hacía nada" en vez de mostrar un error. Ahora
+  /// se escribe la imagen a un archivo temporal real (`path_provider`) y se
+  /// comparte por ruta, que es el flujo soportado de forma consistente en
+  /// iOS y Android. Cualquier falla se muestra al usuario en vez de
+  /// quedar silenciosa.
+  Future<void> _compartir(BuildContext context, String nombreEmpresa) async {
+    try {
+      final bytes = await _capturarReciboComoImagen();
+      final folio = resultado.folio ?? 'recibo';
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/recibo_$folio.png');
+      await file.writeAsBytes(bytes);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'image/png')],
+        subject: 'Comprobante de pago $nombreEmpresa',
+        text: 'Comprobante de pago $nombreEmpresa — Folio $folio',
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo compartir el recibo. Intenta de nuevo.'),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _imprimir(BuildContext context, String nombreEmpresa) async {
@@ -68,7 +87,7 @@ class ReciboPagoScreen extends ConsumerWidget {
     // este MVP. Por ahora reutilizamos el flujo de compartir (imagen del
     // recibo) como acción equivalente para enviar el comprobante a una
     // impresora vía sistema.
-    await _compartir(nombreEmpresa);
+    await _compartir(context, nombreEmpresa);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selecciona una impresora desde el diálogo del sistema.')),
@@ -76,15 +95,21 @@ class ReciboPagoScreen extends ConsumerWidget {
     }
   }
 
-  /// Vuelve a `HomeShell` navegando directo a la ruta nombrada `/home` y
-  /// eliminando todo lo demás del stack. Antes usaba
-  /// `Navigator.popUntil((route) => route.isFirst)`, que depende de que la
-  /// ruta más al fondo del stack sea efectivamente `HomeShell` -- frágil
-  /// (dejaba la pantalla en blanco si esa asunción no se cumplía). Mismo
-  /// patrón ya usado en `main.dart` para volver a `/login` al expirar la
-  /// sesión.
+  /// Vuelve a `HomeShell` cerrando todas las pantallas apiladas encima de
+  /// la ruta raíz (`_RootRouter`, ver `main.dart`).
+  ///
+  /// Antes usaba `pushNamedAndRemoveUntil('/home', ...)`, que reemplazaba
+  /// la ruta raíz por una construida a mano con `HomeShell()` -- eso
+  /// destruía `_RootRouter` (junto con su `ref.listen` de logout automático
+  /// por sesión expirada), dejando la app sin ese listener por el resto de
+  /// la sesión, y en ciertos encadenamientos de rutas producía pantalla en
+  /// negro. `_RootRouter` ya nunca se reemplaza (ver el fix equivalente en
+  /// `login_screen.dart`/`signup_screen.dart`), así que la ruta más al
+  /// fondo del stack SIEMPRE es `_RootRouter`, que muestra `HomeShell`
+  /// automáticamente (es reactivo a `sessionControllerProvider`) apenas se
+  /// vuelve a ella.
   void _volverAlInicio(BuildContext context) {
-    Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -174,7 +199,7 @@ class ReciboPagoScreen extends ConsumerWidget {
                     child: PrimaryButton(
                       label: 'Compartir',
                       icon: Icons.share_outlined,
-                      onPressed: () => _compartir(nombreEmpresa),
+                      onPressed: () => _compartir(context, nombreEmpresa),
                     ),
                   ),
                 ],
@@ -266,7 +291,7 @@ class _ReciboCard extends StatelessWidget {
                 AppSpacing.xxl, AppSpacing.xxl, AppSpacing.xxl, AppSpacing.lg),
             child: Column(
               children: [
-                if (logo != null)
+                if (logo != null) ...[
                   SizedBox(
                     height: 64,
                     child: logo!.esSvg
@@ -278,17 +303,21 @@ class _ReciboCard extends StatelessWidget {
                             Uint8List.fromList(logo!.bytes),
                             height: 64,
                           ),
-                  )
-                else
-                  Text(
-                    nombreEmpresa,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.primaryDark,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
                   ),
+                  const SizedBox(height: 8),
+                ],
+                // El nombre de la empresa SIEMPRE se muestra, tenga logo o
+                // no -- antes el logo lo reemplazaba por completo, dejando
+                // el recibo sin el nombre de la empresa en texto.
+                Text(
+                  nombreEmpresa,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 const Text(
                   'Gestión de préstamos y cobranza',
