@@ -155,15 +155,23 @@ class _RegistrarPagoScreenState extends ConsumerState<RegistrarPagoScreen> {
         clienteNombre: widget.factura.clienteNombre,
       );
 
-      final volverConExito = await Navigator.of(context).push<bool>(
+      // Solo `push`, sin esperar el resultado para hacer un pop propio a
+      // continuación: `ReciboPagoScreen._volverAlInicio` ya hace
+      // `Navigator.popUntil((route) => route.isFirst)`, que cierra ESTA
+      // pantalla (y cualquier otra intermedia, ej. `DetallePrestamoScreen`)
+      // como parte de la misma operación. Si esta pantalla ADEMÁS intentaba
+      // hacer su propio `pop()` en cuanto el recibo se cerraba, competía
+      // por el mismo stack del Navigator con el `popUntil` que ya estaba en
+      // curso -- esa carrera dejaba la app en pantalla negra al volver al
+      // inicio o al cerrar el recibo con la "X" (mismo botón, mismo
+      // método). Con un solo `push` sin acción de seguimiento, el
+      // `popUntil` del recibo se encarga de cerrar toda la cadena de una
+      // vez, sin nadie más disputándole el Navigator.
+      await Navigator.of(context).push<bool>(
         MaterialPageRoute(
           builder: (_) => ReciboPagoScreen(resultado: enriquecido),
         ),
       );
-
-      if (mounted) {
-        Navigator.of(context).pop(volverConExito ?? true);
-      }
     }
   }
 
