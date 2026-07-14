@@ -57,18 +57,21 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
-        # Solo al grupo INTERNO ("Equipo Kovra") -- las pruebas internas no
-        # requieren revision beta de Apple, se instalan de inmediato. Antes
-        # no se listaba ningun grupo, y Codemagic intentaba ADEMAS enviar el
-        # build a revision EXTERNA en cada corrida; como el build #1 quedo
-        # atascado en esa cola de revision, cada build nuevo repetia el
-        # mismo error "Another build is in review" -- inofensivo para las
-        # pruebas internas (que igual llegaban bien), pero ruidoso. Al
-        # listar explicitamente solo el grupo interno, Codemagic ya no
-        # intenta la revision externa.
-        beta_groups:
-          - "Equipo Kovra"
+        # `submit_to_testflight` en false (y sin `beta_groups`) a proposito.
+        # El grupo interno "Equipo Kovra" tiene distribucion AUTOMATICA en
+        # App Store Connect: recibe cada build nuevo apenas Apple termina de
+        # procesarlo, sin que Codemagic tenga que "agregarlo" explicitamente
+        # -- de hecho, intentarlo (`beta_groups: ["Equipo Kovra"]`) da error
+        # ("Cannot add internal group to a build") porque un grupo
+        # automatico no acepta asignacion manual. Y `submit_to_testflight:
+        # true` sin `beta_groups` intenta ADEMAS enviar a revision EXTERNA,
+        # lo que fallaba en cada build mientras el build #1 siguiera
+        # atascado en esa cola ("Another build is in review"). Con
+        # `submit_to_testflight: false`, el .ipa igual se sube y publica a
+        # App Store Connect (eso es lo que hace disponible el build para
+        # "Equipo Kovra" automaticamente) pero sin disparar ninguno de los
+        # dos intentos que fallaban.
+        submit_to_testflight: false
         # Cambia a true solo cuando quieras enviarlo tambien a revision
         # de App Store (no hace falta para instalar via TestFlight).
         submit_to_app_store: false
