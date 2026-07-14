@@ -58,6 +58,17 @@ workflows:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+        # Solo al grupo INTERNO ("Equipo Kovra") -- las pruebas internas no
+        # requieren revision beta de Apple, se instalan de inmediato. Antes
+        # no se listaba ningun grupo, y Codemagic intentaba ADEMAS enviar el
+        # build a revision EXTERNA en cada corrida; como el build #1 quedo
+        # atascado en esa cola de revision, cada build nuevo repetia el
+        # mismo error "Another build is in review" -- inofensivo para las
+        # pruebas internas (que igual llegaban bien), pero ruidoso. Al
+        # listar explicitamente solo el grupo interno, Codemagic ya no
+        # intenta la revision externa.
+        beta_groups:
+          - "Equipo Kovra"
         # Cambia a true solo cuando quieras enviarlo tambien a revision
         # de App Store (no hace falta para instalar via TestFlight).
         submit_to_app_store: false
