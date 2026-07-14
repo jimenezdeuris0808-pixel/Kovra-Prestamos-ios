@@ -18,6 +18,7 @@ import '../../../shared/widgets/quick_detail_tile.dart';
 import '../../prestamos/screens/detalle_prestamo_screen.dart';
 import '../../prestamos/screens/solicitar_prestamo_screen.dart';
 import '../providers/clientes_providers.dart';
+import 'historial_pagos_screen.dart';
 
 /// Pantalla "Detalle Cliente": cabecera con avatar y puntuación, grilla de
 /// datos rápidos, lista de préstamos.
@@ -138,6 +139,32 @@ class _DetalleClienteBody extends ConsumerWidget {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => HistorialPagosScreen(
+                          clienteId: cliente.id,
+                          clienteNombre: cliente.nombreCompleto,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.receipt_long_outlined, size: 18),
+                    label: const Text('Historial de pagos'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 0),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/models/cliente.dart';
+import '../../domain/models/pago_historial_item.dart';
 
 /// Repositorio de clientes: búsqueda, detalle y creación.
 class ClientesRepository {
@@ -47,6 +48,19 @@ class ClientesRepository {
     final list = (data is List) ? data : (data['items'] as List? ?? []);
     return list
         .map((e) => ClienteCarteraItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Historial completo de pagos del cliente (`GET /clientes/{id}/pagos`),
+  /// más reciente primero -- para reenviar/reimprimir el recibo de un cobro
+  /// pasado desde la pantalla de detalle del cliente.
+  Future<List<PagoHistorialItem>> obtenerHistorialPagos(int clienteId) async {
+    final response = await _dio.get('/clientes/$clienteId/pagos');
+    _ensureOk(response);
+    final data = response.data;
+    final list = (data is List) ? data : const [];
+    return list
+        .map((e) => PagoHistorialItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 

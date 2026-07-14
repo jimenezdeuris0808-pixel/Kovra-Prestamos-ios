@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../domain/models/cliente.dart';
+import '../../../domain/models/pago_historial_item.dart';
 
 enum BusquedaStatus { inicial, cargando, exito, sinResultados, error }
 
@@ -110,6 +111,19 @@ final clienteDetalleProvider = FutureProvider.autoDispose
   final repo = ref.watch(clientesRepositoryProvider);
   try {
     return await repo.obtenerDetalle(id);
+  } catch (e) {
+    throw extractErrorMessage(e);
+  }
+});
+
+/// Historial de pagos de un cliente (`GET /clientes/{id}/pagos`), más
+/// reciente primero -- para reenviar/reimprimir el recibo de un cobro
+/// pasado.
+final historialPagosClienteProvider = FutureProvider.autoDispose
+    .family<List<PagoHistorialItem>, int>((ref, clienteId) async {
+  final repo = ref.watch(clientesRepositoryProvider);
+  try {
+    return await repo.obtenerHistorialPagos(clienteId);
   } catch (e) {
     throw extractErrorMessage(e);
   }
