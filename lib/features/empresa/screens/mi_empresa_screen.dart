@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../data/repositories/auth_repository.dart';
 import '../../../domain/models/tenant_branding.dart';
 import '../../../shared/widgets/clay_card.dart';
 import '../../../shared/widgets/error_state.dart';
@@ -34,6 +35,7 @@ class _MiEmpresaScreenState extends ConsumerState<MiEmpresaScreen> {
   bool _prellenado = false;
   Uint8List? _logoNuevoBytes;
   String? _logoNuevoNombre;
+  bool _eliminandoCuenta = false;
 
   @override
   void dispose() {
@@ -82,6 +84,65 @@ class _MiEmpresaScreenState extends ConsumerState<MiEmpresaScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Datos de la empresa actualizados.')),
+      );
+    }
+  }
+
+  /// Flujo de eliminación de cuenta (Directriz 5.1.1(v) de Apple: las apps
+  /// con registro de cuenta deben permitir eliminarla desde dentro de la
+  /// app, no solo desactivarla). Dos pasos: confirmación con advertencia
+  /// explícita de qué se borra, y luego la llamada real a
+  /// `DELETE /auth/account`. Es irreversible: no hay papelera ni forma de
+  /// recuperar la cuenta después.
+  Future<void> _confirmarEliminarCuenta() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar cuenta'),
+        content: const Text(
+          'Esto borra permanentemente tu empresa: todos los clientes, '
+          'préstamos, cuotas, pagos y usuarios asociados. No se puede '
+          'deshacer.\n\n¿Seguro que deseas continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Eliminar cuenta'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar != true || !mounted) return;
+
+    setState(() => _eliminandoCuenta = true);
+    try {
+      await ref.read(authRepositoryProvider).eliminarCuenta();
+      await ref.read(sessionControllerProvider.notifier).logout();
+      // logout() pone la sesión en false y _RootRouter (main.dart) ya
+      // reconstruye devolviendo LoginScreen, pero esta pantalla llegó aquí
+      // vía Navigator.push (Modulos -> Mi Empresa), así que sigue apilada
+      // ENCIMA de esa raíz reactiva y la tapa. Mismo bug que documenta el
+      // comentario de _RootRouter para el logout automático por 401, solo
+      // que a esta profundidad de la pila sí hace falta el pop explícito:
+      // sin esto la pantalla se queda pegada en "Eliminando..." para
+      // siempre aunque el backend ya haya borrado la cuenta.
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true)
+          .popUntil((route) => route.isFirst);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _eliminandoCuenta = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _eliminandoCuenta = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar la cuenta. Intenta de nuevo.')),
       );
     }
   }
@@ -214,6 +275,11 @@ class _MiEmpresaScreenState extends ConsumerState<MiEmpresaScreen> {
                         isLoading: state.isLoading,
                         onPressed: _guardar,
                       ),
+                      const SizedBox(height: AppSpacing.xl),
+                      _ZonaPeligroCard(
+                        isLoading: _eliminandoCuenta,
+                        onEliminarCuenta: _confirmarEliminarCuenta,
+                      ),
                     ],
                   ),
                 ),
@@ -288,6 +354,51 @@ class _AplicaMoraCard extends ConsumerWidget {
                       );
                     }
                   },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Tarjeta "Eliminar cuenta", separada visualmente del resto del
+/// formulario (borde/color de peligro) para que no se confunda con un
+/// ajuste más de la empresa. Ver [_MiEmpresaScreenState._confirmarEliminarCuenta].
+class _ZonaPeligroCard extends StatelessWidget {
+  const _ZonaPeligroCard({required this.isLoading, required this.onEliminarCuenta});
+
+  final bool isLoading;
+  final VoidCallback onEliminarCuenta;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.danger.withOpacity(0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Zona de peligro',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 14.5,
+              color: AppColors.danger,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Elimina tu empresa y todos sus datos de forma permanente.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          SecondaryButton(
+            label: isLoading ? 'Eliminando...' : 'Eliminar cuenta',
+            icon: Icons.delete_forever_outlined,
+            onPressed: isLoading ? null : onEliminarCuenta,
           ),
         ],
       ),

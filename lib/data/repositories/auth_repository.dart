@@ -129,6 +129,23 @@ class AuthRepository {
     throw AuthException(detail);
   }
 
+  /// Elimina PERMANENTEMENTE la cuenta (empresa) de la sesión actual y
+  /// todos sus datos (`DELETE /auth/account`). No se puede deshacer: no hay
+  /// papelera ni reactivación. Requerido por la Directriz 5.1.1(v) de Apple
+  /// (las apps con registro de cuenta deben permitir eliminarla desde la
+  /// propia app). Tras llamar esto, la sesión local debe cerrarse siempre
+  /// (ver [MiEmpresaScreen], que borra el token guardado y navega a login).
+  Future<void> eliminarCuenta() async {
+    final response = await _dio.delete('/auth/account');
+    if (response.statusCode != 204) {
+      final detail = (response.data is Map)
+          ? (response.data['detail']?.toString() ??
+              'No se pudo eliminar la cuenta.')
+          : 'No se pudo eliminar la cuenta.';
+      throw AuthException(detail);
+    }
+  }
+
   /// Bytes del logo del tenant, o `null` si no tiene uno configurado o no
   /// se pudo descargar (no debe romper ninguna pantalla que lo use).
   Future<TenantLogo?> obtenerLogo() async {
