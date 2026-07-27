@@ -11,7 +11,9 @@ import '../../../domain/models/tenant_admin.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/status_badge.dart';
+import '../providers/admin_notificaciones_providers.dart';
 import '../providers/admin_tenants_providers.dart';
+import 'admin_notificaciones_screen.dart';
 import 'admin_tenant_detail_screen.dart';
 
 /// Pantalla principal de administrador: listado de tenants (empresas)
@@ -46,6 +48,8 @@ class AdminHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tenantsAsync = ref.watch(adminTenantsProvider);
+    final noLeidasAsync = ref.watch(adminNotificacionesNoLeidasProvider);
+    final noLeidas = noLeidasAsync.valueOrNull ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundClay,
@@ -54,6 +58,22 @@ class AdminHomeScreen extends ConsumerWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
         actions: [
+          IconButton(
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const AdminNotificacionesScreen(),
+                ),
+              );
+              ref.invalidate(adminNotificacionesNoLeidasProvider);
+            },
+            tooltip: 'Notificaciones',
+            icon: Badge(
+              label: Text('$noLeidas'),
+              isLabelVisible: noLeidas > 0,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+          ),
           IconButton(
             onPressed: () => _confirmarLogout(context, ref),
             tooltip: 'Cerrar sesión',

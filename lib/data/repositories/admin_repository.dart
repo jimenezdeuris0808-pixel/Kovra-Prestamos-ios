@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/models/admin_notificacion.dart';
 import '../../domain/models/tenant_admin.dart';
 
 /// Resultado de un login exitoso contra `POST /admin/auth/login`.
@@ -64,6 +65,26 @@ class AdminRepository {
     );
     _ensureOk(response);
     return TenantAdmin.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<AdminNotificacion>> listarNotificaciones({
+    bool soloNoLeidas = false,
+  }) async {
+    final response = await _dio.get(
+      '/admin/notificaciones',
+      queryParameters: {'solo_no_leidas': soloNoLeidas},
+    );
+    _ensureOk(response);
+    final data = response.data;
+    final list = (data is List) ? data : (data['results'] as List? ?? []);
+    return list
+        .map((e) => AdminNotificacion.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> marcarNotificacionLeida(int id) async {
+    final response = await _dio.patch('/admin/notificaciones/$id/leida');
+    _ensureOk(response, expectedCodes: const [204]);
   }
 
   void _ensureOk(Response response, {List<int> expectedCodes = const [200]}) {
