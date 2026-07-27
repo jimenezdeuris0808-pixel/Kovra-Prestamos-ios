@@ -103,21 +103,61 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 /// Reemplaza el contenido de las 4 tabs mientras la cuenta esté bloqueada:
 /// todas dependen de endpoints que el backend ya rechaza, así que no tiene
 /// sentido mostrar 4 pantallas rotas por separado.
-class _CuentaBloqueadaView extends StatelessWidget {
+///
+/// Trae su propio botón de "Cerrar sesión": las 4 pantallas reales (cada
+/// una con su AppBar y su botón de logout) dejan de mostrarse aquí, así
+/// que sin esto un usuario bloqueado quedaba totalmente atascado, sin
+/// forma de salir para que otro usuario entre en el mismo dispositivo --
+/// bug reportado en dispositivo real.
+class _CuentaBloqueadaView extends ConsumerWidget {
   const _CuentaBloqueadaView();
 
+  Future<void> _confirmarLogout(BuildContext context, WidgetRef ref) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Deseas cerrar sesión?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cerrar sesión'),
+          ),
+        ],
+      ),
+    );
+    if (confirmar == true) {
+      await ref.read(sessionControllerProvider.notifier).logout();
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.all(AppSpacing.xl),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Center(
-        child: EmptyState(
-          icon: Icons.lock_outline,
-          title: 'Cuenta bloqueada',
-          message:
-              'Tu servicio Kovra está vencido. Ningún módulo estará '
-              'disponible hasta que se reactive el pago. Contacta a tu '
-              'suplidor de servicio Kovra.',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const EmptyState(
+              icon: Icons.lock_outline,
+              title: 'Cuenta bloqueada',
+              message:
+                  'Tu servicio Kovra está vencido. Ningún módulo estará '
+                  'disponible hasta que se reactive el pago. Contacta a tu '
+                  'suplidor de servicio Kovra.',
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            OutlinedButton.icon(
+              onPressed: () => _confirmarLogout(context, ref),
+              icon: const Icon(Icons.logout),
+              label: const Text('Cerrar sesión'),
+            ),
+          ],
         ),
       ),
     );
