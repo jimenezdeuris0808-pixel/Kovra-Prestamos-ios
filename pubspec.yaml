@@ -40,6 +40,10 @@ dependencies:
   # Selector de imagen (logo de "Mi Empresa"), funciona en Flutter Web
   image_picker: ^1.1.2
 
+  # Impresion de recibos en impresoras termicas por Bluetooth (Android e iOS)
+  print_bluetooth_thermal: ^1.2.2
+  esc_pos_utils_plus: ^2.0.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

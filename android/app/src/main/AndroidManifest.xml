@@ -1,6 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
 
+    <!-- Impresora termica por Bluetooth (print_bluetooth_thermal). BLUETOOTH/
+         BLUETOOTH_ADMIN son para Android <= 11 (API 30); BLUETOOTH_SCAN/
+         BLUETOOTH_CONNECT son los nuevos permisos "runtime" de Android 12+.
+         neverForLocation en BLUETOOTH_SCAN evita tener que pedir tambien
+         ubicacion: la app solo necesita ver impresoras YA emparejadas desde
+         los ajustes del sistema, no rastrear la posicion del dispositivo. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+
     <application
         android:label="Kovra"
         android:name="${applicationName}"

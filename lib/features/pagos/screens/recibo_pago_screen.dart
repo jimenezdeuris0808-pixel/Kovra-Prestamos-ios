@@ -1,14 +1,16 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/printing/receipt_printer_service.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
@@ -19,6 +21,7 @@ import '../../../domain/models/pago.dart';
 import '../../../domain/models/tenant_branding.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/secondary_button.dart';
+import 'seleccionar_impresora_screen.dart';
 
 /// Pantalla "Recibo de Pago": comprobante en pantalla (nombre de la empresa
 /// del tenant, folio, desglose y código de barras decorativo), botones
@@ -40,7 +43,15 @@ class ReciboPagoScreen extends ConsumerWidget {
   /// Renderiza el recibo (el `RepaintBoundary` marcado con [_reciboKey]) a
   /// PNG en memoria. `pixelRatio: 3` para que se vea nítido al compartirlo a
   /// tamaño completo en WhatsApp/galería, no solo del tamaño de pantalla.
+  ///
+  /// Espera a `endOfFrame` antes de capturar: si el usuario toca
+  /// "Compartir" apenas termina la animación de entrada de esta pantalla
+  /// (push de `MaterialPageRoute`), el `RepaintBoundary` puede no tener
+  /// todavía su primer frame completamente compuesto y `toImage()` lanza
+  /// una excepción -- de ahi el bug reportado ("No se pudo compartir")
+  /// incluso con el archivo temporal ya en su lugar.
   Future<Uint8List> _capturarReciboComoImagen() async {
+    await SchedulerBinding.instance.endOfFrame;
     final boundary = _reciboKey.currentContext!.findRenderObject()
         as RenderRepaintBoundary;
     final image = await boundary.toImage(pixelRatio: 3);
@@ -48,16 +59,15 @@ class ReciboPagoScreen extends ConsumerWidget {
     return byteData!.buffer.asUint8List();
   }
 
-  /// Comparte el recibo como imagen.
+  /// Comparte el recibo como imagen (WhatsApp, correo, galería, etc. --
+  /// cualquier app instalada que acepte imágenes aparece en el selector
+  /// nativo del sistema que abre `Share.shareXFiles`).
   ///
-  /// Antes usaba `XFile.fromData` (bytes en memoria, sin archivo real en
-  /// disco) -- en iOS el share sheet nativo de `share_plus` no siempre
-  /// resuelve ese tipo de `XFile` correctamente, y como la excepción no se
-  /// capturaba, el botón "no hacía nada" en vez de mostrar un error. Ahora
-  /// se escribe la imagen a un archivo temporal real (`path_provider`) y se
-  /// comparte por ruta, que es el flujo soportado de forma consistente en
-  /// iOS y Android. Cualquier falla se muestra al usuario en vez de
-  /// quedar silenciosa.
+  /// Antes la excepción real quedaba silenciada (`catch (_) {}`), así que
+  /// no había forma de saber por qué fallaba -- ahora se registra con
+  /// `debugPrint` (visible en `flutter logs`/consola) para poder
+  /// diagnosticar reportes futuros, y el mensaje al usuario incluye el
+  /// motivo cuando se puede describir en una frase corta.
   Future<void> _compartir(BuildContext context, String nombreEmpresa) async {
     try {
       final bytes = await _capturarReciboComoImagen();
@@ -70,29 +80,54 @@ class ReciboPagoScreen extends ConsumerWidget {
         subject: 'Comprobante de pago $nombreEmpresa',
         text: 'Comprobante de pago $nombreEmpresa — Folio $folio',
       );
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('Error al compartir recibo: $e\n$st');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo compartir el recibo. Intenta de nuevo.'),
+          SnackBar(
+            content: Text('No se pudo compartir el recibo: $e'),
           ),
         );
       }
     }
   }
 
-  Future<void> _imprimir(BuildContext context, String nombreEmpresa) async {
-    // Nota: la impresión real requiere integración con un servicio de
-    // impresión térmica/PDF (ej. paquete `printing`), fuera del alcance de
-    // este MVP. Por ahora reutilizamos el flujo de compartir (imagen del
-    // recibo) como acción equivalente para enviar el comprobante a una
-    // impresora vía sistema.
-    await _compartir(context, nombreEmpresa);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona una impresora desde el diálogo del sistema.')),
+  Future<void> _imprimir(BuildContext context, WidgetRef ref, String nombreEmpresa) async {
+    final printerService = ref.read(receiptPrinterServiceProvider);
+    final macGuardado = await printerService.leerImpresoraGuardada();
+
+    String? mac = macGuardado;
+    if (mac == null) {
+      if (!context.mounted) return;
+      mac = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const SeleccionarImpresoraScreen()),
       );
+      if (mac == null) return;
     }
+
+    if (!context.mounted) return;
+    final mensajeError = await printerService.imprimirRecibo(
+      macAddress: mac,
+      resultado: resultado,
+      nombreEmpresa: nombreEmpresa,
+    );
+
+    if (!context.mounted) return;
+    if (mensajeError == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Recibo enviado a la impresora.')),
+      );
+      return;
+    }
+
+    // La impresora guardada no respondio (apagada, fuera de rango, cambio
+    // de equipo) -- se limpia y se ofrece elegir otra en vez de quedar
+    // pegado a un MAC que ya no sirve.
+    await printerService.olvidarImpresoraGuardada();
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$mensajeError Selecciona la impresora de nuevo.')),
+    );
   }
 
   /// Vuelve a `HomeShell` cerrando todas las pantallas apiladas encima de
@@ -191,7 +226,7 @@ class ReciboPagoScreen extends ConsumerWidget {
                     child: SecondaryButton(
                       label: 'Imprimir',
                       icon: Icons.print_outlined,
-                      onPressed: () => _imprimir(context, nombreEmpresa),
+                      onPressed: () => _imprimir(context, ref, nombreEmpresa),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),

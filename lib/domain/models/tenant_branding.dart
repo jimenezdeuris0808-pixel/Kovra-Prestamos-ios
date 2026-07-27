@@ -11,6 +11,7 @@ class TenantBranding {
     this.rncCedula,
     this.fechaExpiracion,
     this.avisoVigencia,
+    this.cuentaBloqueada = false,
     this.aplicaMora = true,
   });
 
@@ -30,6 +31,13 @@ class TenantBranding {
   /// venció (dentro del período de gracia) -- `null` si no aplica todavía.
   /// Ver `Kovra_API/app/business.py::mensaje_aviso_vigencia`.
   final String? avisoVigencia;
+
+  /// `true` cuando la vigencia del tenant ya venció más allá del período de
+  /// gracia (o el super-admin lo desactivó): el backend responde 403 en
+  /// todos los routers de negocio (clientes, préstamos, pagos, dashboard,
+  /// crédito, cédula) hasta que se reactive el pago. El login sigue
+  /// funcionando siempre -- ver `Kovra_API/app/auth.py::get_current_token_vigente`.
+  final bool cuentaBloqueada;
 
   /// Interruptor de "Mi Empresa": si es `false`, el backend nunca calcula
   /// mora por atraso para NINGÚN préstamo de este tenant (ver
@@ -51,6 +59,7 @@ class TenantBranding {
       rncCedula: json['rnc_cedula'] as String?,
       fechaExpiracion: json['fecha_expiracion'] as String?,
       avisoVigencia: json['aviso_vigencia'] as String?,
+      cuentaBloqueada: json['cuenta_bloqueada'] as bool? ?? false,
       aplicaMora: json['aplica_mora'] as bool? ?? true,
     );
   }

@@ -17,6 +17,12 @@ class SecureStorageService {
   static const _nombreEmpresaKey = 'kovra_auth_nombre_empresa';
   static const _nombreComercialKey = 'kovra_auth_nombre_comercial';
 
+  /// MAC de la impresora térmica Bluetooth elegida por el usuario en este
+  /// dispositivo. A propósito NO se borra en [clearSession] -- es una
+  /// preferencia del dispositivo/impresora física, no de la sesión del
+  /// tenant, así que sobrevive a cerrar sesión y volver a entrar.
+  static const _printerMacKey = 'kovra_printer_mac';
+
   Future<void> saveSession({
     required String token,
     required String role,
@@ -65,6 +71,12 @@ class SecureStorageService {
     final token = await readToken();
     return token != null && token.isNotEmpty;
   }
+
+  Future<void> savePrinterMac(String mac) => _storage.write(key: _printerMacKey, value: mac);
+
+  Future<String?> readPrinterMac() => _storage.read(key: _printerMacKey);
+
+  Future<void> clearPrinterMac() => _storage.delete(key: _printerMacKey);
 
   Future<void> clearSession() async {
     await _storage.delete(key: _tokenKey);

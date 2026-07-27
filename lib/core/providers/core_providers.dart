@@ -171,3 +171,18 @@ final avisoVigenciaProvider = FutureProvider<String?>((ref) async {
     return null;
   }
 });
+
+/// `true` si la cuenta esta bloqueada por vigencia vencida (ver
+/// `TenantBranding.cuentaBloqueada`). Mismo criterio que
+/// [avisoVigenciaProvider]: se pide en vivo cada vez (no se cachea), y si
+/// la peticion falla (offline) se trata como "no bloqueada" en vez de
+/// dejar a un usuario legitimo sin acceso por un problema de red.
+final cuentaBloqueadaProvider = FutureProvider<bool>((ref) async {
+  ref.watch(sessionControllerProvider);
+  try {
+    final branding = await ref.read(authRepositoryProvider).obtenerBranding();
+    return branding.cuentaBloqueada;
+  } catch (_) {
+    return false;
+  }
+});
