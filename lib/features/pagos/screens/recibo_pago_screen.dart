@@ -68,7 +68,14 @@ class ReciboPagoScreen extends ConsumerWidget {
   /// `debugPrint` (visible en `flutter logs`/consola) para poder
   /// diagnosticar reportes futuros, y el mensaje al usuario incluye el
   /// motivo cuando se puede describir en una frase corta.
+  ///
+  /// `sharePositionOrigin` es obligatorio en iOS (probado en dispositivo
+  /// real, ver bug reportado: `PlatformException(..., sharePositionOrigin:
+  /// argument must be set...)`) -- ahí es donde el sistema ancla el
+  /// popover del selector de apps. Se calcula a partir del propio árbol de
+  /// widgets de esta pantalla, sin depender de un botón específico.
   Future<void> _compartir(BuildContext context, String nombreEmpresa) async {
+    final box = context.findRenderObject() as RenderBox?;
     try {
       final bytes = await _capturarReciboComoImagen();
       final folio = resultado.folio ?? 'recibo';
@@ -79,6 +86,8 @@ class ReciboPagoScreen extends ConsumerWidget {
         [XFile(file.path, mimeType: 'image/png')],
         subject: 'Comprobante de pago $nombreEmpresa',
         text: 'Comprobante de pago $nombreEmpresa — Folio $folio',
+        sharePositionOrigin:
+            box != null ? (box.localToGlobal(Offset.zero) & box.size) : null,
       );
     } catch (e, st) {
       debugPrint('Error al compartir recibo: $e\n$st');

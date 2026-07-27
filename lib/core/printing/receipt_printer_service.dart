@@ -89,7 +89,7 @@ class ReceiptPrinterService {
     final bytes = <int>[];
 
     bytes.addAll(generator.text(
-      nombreEmpresa,
+      _sanitizar(nombreEmpresa),
       styles: const PosStyles(align: PosAlign.center, bold: true, height: PosTextSize.size2, width: PosTextSize.size2),
     ));
     bytes.addAll(generator.text(
@@ -118,22 +118,39 @@ class ReceiptPrinterService {
 
     bytes.addAll(generator.feed(2));
     bytes.addAll(generator.text(
-      resultado.folio ?? '',
+      _sanitizar(resultado.folio ?? ''),
       styles: const PosStyles(align: PosAlign.center),
     ));
     bytes.addAll(generator.cut());
     return bytes;
   }
 
+  /// Reemplaza caracteres Unicode que el códec del generador ESC/POS no
+  /// sabe codificar (ej. el espacio angosto U+202F que el locale español
+  /// de `intl` mete entre la hora y "p. m." -- bug reportado en
+  /// dispositivo real: "Invalid argument (string): Contains invalid
+  /// characters"). Cualquier caracter fuera del rango Latin-1 (0-255, lo
+  /// que soportan las tablas de codepage típicas de estas impresoras) se
+  /// reemplaza por un espacio o "?" en vez de reventar la impresión
+  /// completa por un solo caracter raro en un nombre o fecha.
+  String _sanitizar(String texto) {
+    return texto
+        .replaceAll(' ', ' ')
+        .replaceAll(' ', ' ')
+        .runes
+        .map((r) => r <= 0xFF ? String.fromCharCode(r) : '?')
+        .join();
+  }
+
   List<int> _fila(Generator generator, String label, String value, {bool destacado = false}) {
     return generator.row([
       PosColumn(
-        text: label,
+        text: _sanitizar(label),
         width: 6,
         styles: const PosStyles(align: PosAlign.left),
       ),
       PosColumn(
-        text: value,
+        text: _sanitizar(value),
         width: 6,
         styles: PosStyles(align: PosAlign.right, bold: destacado),
       ),
