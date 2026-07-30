@@ -112,5 +112,12 @@ workflows:
       - name: Build APK (release)
         script: flutter build apk --release
 
+      # Google Play exige Android App Bundle (.aab), no APK -- mismo
+      # key.properties generado arriba sirve para ambos, Gradle firma los
+      # dos formatos con la misma signingConfig "release".
+      - name: Build App Bundle (release) para Play Store
+        script: flutter build appbundle --release
+
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/bundle/release/*.aab
