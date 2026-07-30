@@ -6,6 +6,11 @@
 #      Team settings > Code signing identities -- Codemagic puede generarlo
 #      el solo si le das permiso via la misma integracion de App Store Connect.
 #   3. Conectar este repo (GitHub) como la fuente del proyecto.
+#   4. Para el workflow android-release: subir el keystore de release
+#      (C:\Users\acer\kovra-release-key.jks en la maquina local) en
+#      Team settings > Code signing identities > Android keystores, con
+#      referencia "kovra_android_release" (alias, store password y key
+#      password son los mismos que ya estan en android/key.properties).
 workflows:
   ios-testflight:
     name: Kovra Mobile - iOS (TestFlight)
@@ -75,3 +80,34 @@ workflows:
         # Cambia a true solo cuando quieras enviarlo tambien a revision
         # de App Store (no hace falta para instalar via TestFlight).
         submit_to_app_store: false
+
+  android-release:
+    name: Kovra Mobile - Android (APK release)
+    max_build_duration: 60
+    environment:
+      android_signing:
+        - kovra_android_release
+      flutter: stable
+    scripts:
+      - name: Instalar dependencias de Flutter
+        script: flutter packages pub get
+
+      # Genera android/key.properties con el keystore que subiste a Codemagic
+      # (variables CM_KEYSTORE_PATH/CM_KEYSTORE_PASSWORD/CM_KEY_ALIAS/
+      # CM_KEY_PASSWORD, inyectadas automaticamente por el "android_signing"
+      # de arriba) -- mismo archivo que build.gradle.kts ya lee en local,
+      # sin tener que commitear la keystore ni sus contraseñas al repo.
+      - name: Configurar firma de release (key.properties)
+        script: |
+          cat > "$CM_BUILD_DIR/android/key.properties" <<EOF
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=$CM_KEYSTORE_PATH
+          EOF
+
+      - name: Build APK (release)
+        script: flutter build apk --release
+
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
