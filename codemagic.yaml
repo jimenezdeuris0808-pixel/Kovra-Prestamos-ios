@@ -6,11 +6,11 @@
 #      Team settings > Code signing identities -- Codemagic puede generarlo
 #      el solo si le das permiso via la misma integracion de App Store Connect.
 #   3. Conectar este repo (GitHub) como la fuente del proyecto.
-#   4. Para el workflow android-release: subir el keystore de release
-#      (C:\Users\acer\kovra-release-key.jks en la maquina local) en
-#      Team settings > Code signing identities > Android keystores, con
-#      referencia "kovra_android_release" (alias, store password y key
-#      password son los mismos que ya estan en android/key.properties).
+#   4. Para el workflow android-release: variables de entorno del grupo
+#      "android_signing" (KOVRA_KEYSTORE_BASE64, KOVRA_KEYSTORE_PASSWORD,
+#      KOVRA_KEY_ALIAS, KOVRA_KEY_PASSWORD) creadas via API en vez de subir
+#      el keystore por la UI de "Android keystores" (esa funcion no tiene
+#      endpoint de API). Ver app/variables en la API de Codemagic.
 workflows:
   ios-testflight:
     name: Kovra Mobile - iOS (TestFlight)
@@ -85,25 +85,28 @@ workflows:
     name: Kovra Mobile - Android (APK release)
     max_build_duration: 60
     environment:
-      android_signing:
-        - kovra_android_release
+      groups:
+        - android_signing
       flutter: stable
     scripts:
       - name: Instalar dependencias de Flutter
         script: flutter packages pub get
 
-      # Genera android/key.properties con el keystore que subiste a Codemagic
-      # (variables CM_KEYSTORE_PATH/CM_KEYSTORE_PASSWORD/CM_KEY_ALIAS/
-      # CM_KEY_PASSWORD, inyectadas automaticamente por el "android_signing"
-      # de arriba) -- mismo archivo que build.gradle.kts ya lee en local,
-      # sin tener que commitear la keystore ni sus contraseñas al repo.
+      # El keystore de release vive como variable de entorno propia
+      # (KOVRA_KEYSTORE_BASE64, grupo android_signing) en vez de subirse via
+      # la funcion de "Android keystore" de Codemagic -- esa funcion solo se
+      # puede configurar desde la UI web (no hay endpoint de API), y esta
+      # app se administra por API/CLI. Se decodifica a un .jks temporal y se
+      # genera android/key.properties con las demas variables del grupo,
+      # mismo archivo que build.gradle.kts ya lee en local.
       - name: Configurar firma de release (key.properties)
         script: |
+          echo "$KOVRA_KEYSTORE_BASE64" | base64 -d > "$CM_BUILD_DIR/android/kovra-release-key.jks"
           cat > "$CM_BUILD_DIR/android/key.properties" <<EOF
-          storePassword=$CM_KEYSTORE_PASSWORD
-          keyPassword=$CM_KEY_PASSWORD
-          keyAlias=$CM_KEY_ALIAS
-          storeFile=$CM_KEYSTORE_PATH
+          storePassword=$KOVRA_KEYSTORE_PASSWORD
+          keyPassword=$KOVRA_KEY_PASSWORD
+          keyAlias=$KOVRA_KEY_ALIAS
+          storeFile=$CM_BUILD_DIR/android/kovra-release-key.jks
           EOF
 
       - name: Build APK (release)
