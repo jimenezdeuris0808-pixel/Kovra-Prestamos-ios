@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../data/repositories/prestamos_repository.dart';
+import '../../../domain/models/abono_capital.dart';
 import '../../../domain/models/prestamo.dart';
 import '../../../domain/models/prestamo_busqueda_cross_tenant.dart';
 import '../../../domain/models/prestamo_cartera.dart';
@@ -182,4 +183,60 @@ final aprobarRechazarPrestamoControllerProvider = StateNotifierProvider
     .autoDispose<AprobarRechazarPrestamoController,
         AprobarRechazarPrestamoState>((ref) {
   return AprobarRechazarPrestamoController(ref);
+});
+
+class AbonoCapitalState {
+  const AbonoCapitalState({this.isLoading = false, this.errorMessage});
+
+  final bool isLoading;
+  final String? errorMessage;
+
+  AbonoCapitalState copyWith({bool? isLoading, String? errorMessage}) {
+    return AbonoCapitalState(
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage,
+    );
+  }
+}
+
+/// Controlador del abono libre a capital (`POST /prestamos/{id}/abono`),
+/// cobrable en cualquier momento aunque no haya cuota pendiente.
+class AbonoCapitalController extends StateNotifier<AbonoCapitalState> {
+  AbonoCapitalController(this._ref) : super(const AbonoCapitalState());
+
+  final Ref _ref;
+
+  Future<AbonoCapitalResultado?> abonar({
+    required int prestamoId,
+    required double monto,
+    required String metodo,
+    String? referencia,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final repo = _ref.read(prestamosRepositoryProvider);
+      final resultado = await repo.abonarCapital(
+        prestamoId: prestamoId,
+        monto: monto,
+        metodo: metodo,
+        referencia: referencia,
+      );
+      state = state.copyWith(isLoading: false);
+      return resultado;
+    } on PrestamosException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'No se pudo registrar el abono. Intenta de nuevo.',
+      );
+      return null;
+    }
+  }
+}
+
+final abonoCapitalControllerProvider = StateNotifierProvider.autoDispose<
+    AbonoCapitalController, AbonoCapitalState>((ref) {
+  return AbonoCapitalController(ref);
 });

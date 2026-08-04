@@ -50,6 +50,7 @@ class Prestamo {
     this.reenganchadoPorPrestamoId,
     this.tipoAmortizacion,
     this.frecuenciaTasa,
+    this.capitalPendiente,
   });
 
   final int id;
@@ -74,6 +75,11 @@ class Prestamo {
   /// "mensual", "anual"). Ver NOTES_AMORTIZACION_FRECUENCIA.md.
   final String? frecuenciaTasa;
 
+  /// Capital todavía pendiente de pagar (distinto de `monto`, que es el
+  /// capital ORIGINAL y nunca cambia). Se reduce con cada abono libre a
+  /// capital. `null` si el backend todavía no lo manda (respuestas viejas).
+  final double? capitalPendiente;
+
   /// Motivo del reenganche, tal como lo ingresó el asesor al crearlo.
   final String? motivoReenganche;
 
@@ -81,12 +87,22 @@ class Prestamo {
   /// reemplazado por otro). `null` si nadie lo reenganchó.
   final int? reenganchadoPorPrestamoId;
 
+  /// Total real pendiente de pagar. Para "Plazo Indefinido" las facturas
+  /// solo representan cuotas de INTERÉS (el capital nunca vive en
+  /// `facturas`, ver `Kovra_API/app/routers/pagos_router.py`), así que hay
+  /// que sumarle el capital pendiente aparte -- de lo contrario "Saldar
+  /// préstamo" cobraría de menos (solo el interés de la cuota actual, sin
+  /// el capital prestado). Para los demás tipos de amortización el capital
+  /// ya está incluido en cada cuota, así que basta con sumar las facturas.
   double get saldoPendiente {
-    final total = facturas.fold<double>(
+    final totalFacturas = facturas.fold<double>(
       0,
       (acc, f) => acc + f.montoPendiente,
     );
-    return total;
+    if (tipoAmortizacion == 'Plazo Indefinido') {
+      return (capitalPendiente ?? monto) + totalFacturas;
+    }
+    return totalFacturas;
   }
 
   double get moraTotal {
@@ -115,6 +131,7 @@ class Prestamo {
       reenganchadoPorPrestamoId: json['reenganchado_por_prestamo_id'] as int?,
       tipoAmortizacion: json['tipo_prestamo']?.toString(),
       frecuenciaTasa: json['frecuencia_tasa']?.toString(),
+      capitalPendiente: (json['capital_pendiente'] as num?)?.toDouble(),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../../domain/models/abono_capital.dart';
 import '../../domain/models/prestamo.dart';
 import '../../domain/models/prestamo_busqueda_cross_tenant.dart';
 import '../../domain/models/prestamo_cartera.dart';
@@ -109,6 +110,28 @@ class PrestamosRepository {
     final response = await _dio.post('/prestamos/$prestamoId/rechazar');
     _ensureOk(response);
     return PrestamoRechazado.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// `POST /prestamos/{id}/abono` — abono libre a capital, cobrable en
+  /// cualquier momento aunque el préstamo no tenga ninguna cuota pendiente
+  /// ahora mismo (a diferencia de `POST /pagos`, que siempre exige una
+  /// factura impaga existente).
+  Future<AbonoCapitalResultado> abonarCapital({
+    required int prestamoId,
+    required double monto,
+    required String metodo,
+    String? referencia,
+  }) async {
+    final response = await _dio.post(
+      '/prestamos/$prestamoId/abono',
+      data: {
+        'monto': monto,
+        'metodo': metodo,
+        if (referencia != null && referencia.isNotEmpty) 'referencia': referencia,
+      },
+    );
+    _ensureOk(response, expectedCodes: const [200, 201]);
+    return AbonoCapitalResultado.fromJson(response.data as Map<String, dynamic>);
   }
 
   void _ensureOk(Response response, {List<int> expectedCodes = const [200]}) {

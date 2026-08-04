@@ -19,6 +19,7 @@ import '../../../shared/widgets/secondary_button.dart';
 import '../../pagos/screens/registrar_pago_screen.dart';
 import '../../pagos/screens/saldar_prestamo_screen.dart';
 import '../providers/prestamos_providers.dart';
+import 'abonar_capital_screen.dart';
 
 /// Pantalla "Detalle Préstamo": cabecera con estado, grilla de "detalles
 /// rápidos", aviso de saldo pendiente, lista de cuotas y acceso directo a
@@ -78,6 +79,15 @@ class _DetallePrestamoBody extends ConsumerWidget {
     ref.invalidate(prestamoDetalleProvider(prestamo.id));
   }
 
+  Future<void> _abrirAbono(BuildContext context, WidgetRef ref) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => AbonarCapitalScreen(prestamo: prestamo),
+      ),
+    );
+    ref.invalidate(prestamoDetalleProvider(prestamo.id));
+  }
+
   Factura? get _proximaCuotaPagable {
     for (final f in prestamo.facturas) {
       if (f.esPagable) return f;
@@ -85,10 +95,20 @@ class _DetallePrestamoBody extends ConsumerWidget {
     return null;
   }
 
+  /// Cobrable = el préstamo admite pagos/abonos ahora mismo (mismo criterio
+  /// que `ESTADOS_PRESTAMO_COBRABLES` del backend). Determina si se muestra
+  /// "Abonar a capital", que a diferencia de "Cobrar cuota" NO depende de
+  /// que exista una factura pendiente -- es lo que permite cobrar/abonar en
+  /// cualquier momento aunque el cliente esté al día.
+  bool get _esCobrable =>
+      prestamo.estado == EstadoPrestamo.aprobado ||
+      prestamo.estado == EstadoPrestamo.enAcuerdo;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final esPendiente = prestamo.estado == EstadoPrestamo.pendiente;
     final proximaCuota = esPendiente ? null : _proximaCuotaPagable;
+    final esCobrable = _esCobrable;
 
     return Stack(
       children: [
@@ -146,7 +166,7 @@ class _DetallePrestamoBody extends ConsumerWidget {
               else
                 SliverPadding(
                   padding: EdgeInsets.fromLTRB(AppSpacing.lg, 0,
-                      AppSpacing.lg, proximaCuota != null ? 96 : AppSpacing.lg),
+                      AppSpacing.lg, esCobrable ? 96 : AppSpacing.lg),
                   sliver: SliverList.separated(
                     itemCount: prestamo.facturas.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -164,7 +184,7 @@ class _DetallePrestamoBody extends ConsumerWidget {
             ],
           ],
         ),
-        if (proximaCuota != null)
+        if (esCobrable)
           Positioned(
             left: AppSpacing.lg,
             right: AppSpacing.lg,
@@ -172,24 +192,39 @@ class _DetallePrestamoBody extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Paga TODO el saldo del préstamo de una sola vez, sin
-                // importar si alguna cuota aún no llega a su fecha de
-                // vencimiento -- equivalente móvil del botón "✓ Saldar"
-                // que ya existía en Kovra Web.
+                // Cobro/abono libre: disponible SIEMPRE que el préstamo
+                // esté activo, tenga o no una cuota pendiente ahora mismo
+                // (a diferencia de "Cobrar cuota" y "Saldar préstamo", que
+                // solo aplican cuando hay saldo pendiente). Es lo que deja
+                // hacer un abono a capital aunque el cliente esté al día.
                 SecondaryButton(
-                  icon: Icons.done_all,
-                  label: 'Saldar préstamo · '
-                      '${Formatters.currency(prestamo.saldoPendiente + prestamo.moraTotal)}',
-                  onPressed: () => _abrirSaldar(context, ref),
+                  icon: Icons.savings_outlined,
+                  label: 'Abonar a capital',
+                  onPressed: () => _abrirAbono(context, ref),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                PrimaryButton(
-                  backgroundColor: AppColors.success,
-                  icon: Icons.payments_outlined,
-                  label: 'Cobrar cuota #${proximaCuota.numeroCuota} · '
-                      '${Formatters.currency(proximaCuota.totalConMora)}',
-                  onPressed: () => _abrirPago(context, ref, proximaCuota),
-                ),
+                if (prestamo.saldoPendiente > 0) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  // Paga TODO el saldo del préstamo de una sola vez, sin
+                  // importar si alguna cuota aún no llega a su fecha de
+                  // vencimiento -- equivalente móvil del botón "✓ Saldar"
+                  // que ya existía en Kovra Web.
+                  SecondaryButton(
+                    icon: Icons.done_all,
+                    label: 'Saldar préstamo · '
+                        '${Formatters.currency(prestamo.saldoPendiente + prestamo.moraTotal)}',
+                    onPressed: () => _abrirSaldar(context, ref),
+                  ),
+                ],
+                if (proximaCuota != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  PrimaryButton(
+                    backgroundColor: AppColors.success,
+                    icon: Icons.payments_outlined,
+                    label: 'Cobrar cuota #${proximaCuota.numeroCuota} · '
+                        '${Formatters.currency(proximaCuota.totalConMora)}',
+                    onPressed: () => _abrirPago(context, ref, proximaCuota),
+                  ),
+                ],
               ],
             ),
           ),
