@@ -15,7 +15,9 @@ import '../../../shared/widgets/estado_prestamo_badge.dart';
 import '../../../shared/widgets/gradient_header.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/quick_detail_tile.dart';
+import '../../../shared/widgets/secondary_button.dart';
 import '../../pagos/screens/registrar_pago_screen.dart';
+import '../../pagos/screens/saldar_prestamo_screen.dart';
 import '../providers/prestamos_providers.dart';
 
 /// Pantalla "Detalle Préstamo": cabecera con estado, grilla de "detalles
@@ -65,6 +67,15 @@ class _DetallePrestamoBody extends ConsumerWidget {
     if (resultado == true) {
       ref.invalidate(prestamoDetalleProvider(prestamo.id));
     }
+  }
+
+  Future<void> _abrirSaldar(BuildContext context, WidgetRef ref) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => SaldarPrestamoScreen(prestamo: prestamo),
+      ),
+    );
+    ref.invalidate(prestamoDetalleProvider(prestamo.id));
   }
 
   Factura? get _proximaCuotaPagable {
@@ -158,12 +169,28 @@ class _DetallePrestamoBody extends ConsumerWidget {
             left: AppSpacing.lg,
             right: AppSpacing.lg,
             bottom: AppSpacing.lg,
-            child: PrimaryButton(
-              backgroundColor: AppColors.success,
-              icon: Icons.payments_outlined,
-              label: 'Cobrar cuota #${proximaCuota.numeroCuota} · '
-                  '${Formatters.currency(proximaCuota.totalConMora)}',
-              onPressed: () => _abrirPago(context, ref, proximaCuota),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Paga TODO el saldo del préstamo de una sola vez, sin
+                // importar si alguna cuota aún no llega a su fecha de
+                // vencimiento -- equivalente móvil del botón "✓ Saldar"
+                // que ya existía en Kovra Web.
+                SecondaryButton(
+                  icon: Icons.done_all,
+                  label: 'Saldar préstamo · '
+                      '${Formatters.currency(prestamo.saldoPendiente + prestamo.moraTotal)}',
+                  onPressed: () => _abrirSaldar(context, ref),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                PrimaryButton(
+                  backgroundColor: AppColors.success,
+                  icon: Icons.payments_outlined,
+                  label: 'Cobrar cuota #${proximaCuota.numeroCuota} · '
+                      '${Formatters.currency(proximaCuota.totalConMora)}',
+                  onPressed: () => _abrirPago(context, ref, proximaCuota),
+                ),
+              ],
             ),
           ),
       ],
