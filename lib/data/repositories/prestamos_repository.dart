@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/models/abono_capital.dart';
+import '../../domain/models/editar_prestamo.dart';
 import '../../domain/models/prestamo.dart';
 import '../../domain/models/prestamo_busqueda_cross_tenant.dart';
 import '../../domain/models/prestamo_cartera.dart';
@@ -132,6 +133,26 @@ class PrestamosRepository {
     );
     _ensureOk(response, expectedCodes: const [200, 201]);
     return AbonoCapitalResultado.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// `PATCH /prestamos/{id}/editar` — edita la tasa de interés y/o el
+  /// capital pendiente de un préstamo ya creado, en cualquier momento
+  /// (esté al día, atrasado, o a punto de pagar). Al menos uno de los dos
+  /// debe venir.
+  Future<EditarPrestamoResultado> editar({
+    required int prestamoId,
+    double? tasaInteres,
+    double? capitalPendiente,
+  }) async {
+    final response = await _dio.patch(
+      '/prestamos/$prestamoId/editar',
+      data: {
+        if (tasaInteres != null) 'tasa_interes': tasaInteres,
+        if (capitalPendiente != null) 'capital_pendiente': capitalPendiente,
+      },
+    );
+    _ensureOk(response);
+    return EditarPrestamoResultado.fromJson(response.data as Map<String, dynamic>);
   }
 
   void _ensureOk(Response response, {List<int> expectedCodes = const [200]}) {

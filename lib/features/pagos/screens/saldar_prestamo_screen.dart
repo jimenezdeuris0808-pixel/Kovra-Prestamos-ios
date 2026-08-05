@@ -20,11 +20,16 @@ import 'recibo_pago_screen.dart';
 /// idea que el botón "✓ Saldar" que ya existe en Kovra Web
 /// (`app_web.py::panel_cobros`), que en la app móvil no tenía equivalente.
 ///
-/// No hace falta un endpoint nuevo: se manda un solo `POST /pagos` contra
-/// la cuota impaga más antigua por el monto total pendiente del préstamo, y
-/// el backend ya sabe repartir el excedente en cascada sobre las demás
-/// cuotas hasta dejarlas todas pagadas (ver
-/// `Kovra_API/app/routers/pagos_router.py`, sección "Cascada").
+/// Dos caminos según el tipo de amortización:
+/// - Con plan de cuotas fijo (Simple/Francés/Alemán): un solo `POST /pagos`
+///   contra la cuota impaga más antigua por el total pendiente -- el
+///   backend reparte el excedente en cascada sobre las demás cuotas.
+/// - "Plazo Indefinido" (interés-solo): las facturas SOLO representan
+///   interés, el capital nunca vive ahí (ver `pagos_router.py`), así que
+///   la cascada de `POST /pagos` NO alcanza el capital prestado -- pagaba
+///   de menos. Aquí se paga la cuota de interés pendiente (si hay) con
+///   `POST /pagos` y el capital restante aparte con
+///   `POST /prestamos/{id}/abono`.
 class SaldarPrestamoScreen extends ConsumerStatefulWidget {
   const SaldarPrestamoScreen({super.key, required this.prestamo});
 
@@ -39,12 +44,14 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
   final _referenciaController = TextEditingController();
   MetodoPago _metodo = MetodoPago.efectivo;
 
-  /// Cuota impaga más antigua: es la que se manda como `factura_id` en
-  /// `POST /pagos` para que la cascada del backend reparta el total sobre
-  /// ella y, en orden, sobre todas las demás cuotas pendientes del
-  /// préstamo (ver `Kovra_API/app/routers/pagos_router.py`).
-  Factura get _facturaObjetivo =>
-      widget.prestamo.facturas.firstWhere((f) => f.estado != EstadoFactura.pagada);
+  bool get _esIndefinido => widget.prestamo.tipoAmortizacion == 'Plazo Indefinido';
+
+  Factura? get _facturaPendiente {
+    for (final f in widget.prestamo.facturas) {
+      if (f.estado != EstadoFactura.pagada) return f;
+    }
+    return null;
+  }
 
   double get _capitalPendiente => widget.prestamo.saldoPendiente;
   double get _moraTotal => widget.prestamo.moraTotal;
@@ -65,19 +72,17 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
       return;
     }
 
-    final resultado = await ref.read(registrarPagoControllerProvider.notifier).registrar(
-          facturaId: _facturaObjetivo.id,
-          monto: _totalAPagar,
-          metodo: _metodo,
-          referencia: _metodo.requiereReferencia
-              ? _referenciaController.text.trim()
-              : null,
-        );
+    final referencia =
+        _metodo.requiereReferencia ? _referenciaController.text.trim() : null;
+
+    final resultado = _esIndefinido
+        ? await _saldarIndefinido(referencia)
+        : await _saldarConCascada(referencia);
 
     if (resultado != null && mounted) {
       // Mismas invalidaciones que un pago normal (ver registrar_pago_screen.dart):
-      // saldar cambia el estado del préstamo a "pagado" y afecta todos los
-      // resúmenes que dependen de facturas/pagos.
+      // saldar cambia el estado del préstamo y afecta todos los resúmenes
+      // que dependen de facturas/pagos.
       ref.invalidate(dashboardCobrosHoyProvider);
       ref.invalidate(dashboardResumenProvider);
       ref.invalidate(dashboardResumenGeneralProvider);
@@ -87,7 +92,7 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
       final enriquecido = resultado.copyWith(
         montoTransaccion: _totalAPagar,
         metodo: _metodo,
-        referencia: _referenciaController.text.trim(),
+        referencia: referencia,
         folio: 'SLD-${widget.prestamo.id}-${DateTime.now().millisecondsSinceEpoch % 100000}',
         fecha: DateTime.now(),
         clienteNombre: widget.prestamo.clienteNombre,
@@ -101,9 +106,62 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
     }
   }
 
+  /// Préstamos con plan de cuotas fijo: la cascada de `POST /pagos` ya
+  /// reparte el total sobre todas las cuotas pendientes por sí sola.
+  Future<PagoResultado?> _saldarConCascada(String? referencia) async {
+    final factura = _facturaPendiente;
+    if (factura == null) return null;
+    return ref.read(registrarPagoControllerProvider.notifier).registrar(
+          facturaId: factura.id,
+          monto: _totalAPagar,
+          metodo: _metodo,
+          referencia: referencia,
+        );
+  }
+
+  /// "Plazo Indefinido": paga la cuota de interés pendiente (si hay) y
+  /// abona el capital restante aparte, porque el capital nunca vive en
+  /// las facturas de este tipo de préstamo.
+  Future<PagoResultado?> _saldarIndefinido(String? referencia) async {
+    PagoResultado? resultadoInteres;
+    final factura = _facturaPendiente;
+    if (factura != null) {
+      resultadoInteres = await ref.read(registrarPagoControllerProvider.notifier).registrar(
+            facturaId: factura.id,
+            monto: factura.totalConMora,
+            metodo: _metodo,
+            referencia: referencia,
+          );
+      if (resultadoInteres == null) return null;
+    }
+
+    final capital = widget.prestamo.capitalPendiente ?? widget.prestamo.monto;
+    if (capital <= 0.01) {
+      return resultadoInteres;
+    }
+
+    final abono = await ref.read(abonoCapitalControllerProvider.notifier).abonar(
+          prestamoId: widget.prestamo.id,
+          monto: capital,
+          metodo: _metodo.apiValue,
+          referencia: referencia,
+        );
+    if (abono == null) return null;
+
+    return PagoResultado(
+      estadoFactura: resultadoInteres?.estadoFactura ?? 'pagado',
+      montoPagado: capital + (resultadoInteres?.montoPagado ?? 0),
+      mora: resultadoInteres?.mora ?? 0,
+      prestamoEstado: resultadoInteres?.prestamoEstado,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(registrarPagoControllerProvider);
+    final pagoState = ref.watch(registrarPagoControllerProvider);
+    final abonoState = ref.watch(abonoCapitalControllerProvider);
+    final isLoading = pagoState.isLoading || abonoState.isLoading;
+    final errorMessage = pagoState.errorMessage ?? abonoState.errorMessage;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundClay,
@@ -129,7 +187,7 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
                   ),
                   const SizedBox(height: 14),
                   _FilaResumen(
-                    label: 'Capital pendiente',
+                    label: 'Capital + interés pendiente',
                     value: Formatters.currency(_capitalPendiente),
                   ),
                   _FilaResumen(
@@ -173,7 +231,7 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
                 ),
               ),
             ],
-            if (state.errorMessage != null) ...[
+            if (errorMessage != null) ...[
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
@@ -182,7 +240,7 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      state.errorMessage!,
+                      errorMessage,
                       style: const TextStyle(
                           color: AppColors.dangerStrong, fontSize: 13),
                     ),
@@ -194,7 +252,7 @@ class _SaldarPrestamoScreenState extends ConsumerState<SaldarPrestamoScreen> {
             PrimaryButton(
               label: 'Confirmar saldo · ${Formatters.currency(_totalAPagar)}',
               icon: Icons.check_circle_outline,
-              isLoading: state.isLoading,
+              isLoading: isLoading,
               onPressed: _confirmar,
             ),
           ],

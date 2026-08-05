@@ -20,6 +20,7 @@ import '../../pagos/screens/registrar_pago_screen.dart';
 import '../../pagos/screens/saldar_prestamo_screen.dart';
 import '../providers/prestamos_providers.dart';
 import 'abonar_capital_screen.dart';
+import 'editar_prestamo_screen.dart';
 
 /// Pantalla "Detalle Préstamo": cabecera con estado, grilla de "detalles
 /// rápidos", aviso de saldo pendiente, lista de cuotas y acceso directo a
@@ -29,13 +30,33 @@ class DetallePrestamoScreen extends ConsumerWidget {
 
   final int prestamoId;
 
+  Future<void> _abrirEditar(
+      BuildContext context, WidgetRef ref, Prestamo prestamo) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => EditarPrestamoScreen(prestamo: prestamo)),
+    );
+    ref.invalidate(prestamoDetalleProvider(prestamoId));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prestamoAsync = ref.watch(prestamoDetalleProvider(prestamoId));
+    final prestamoCargado = prestamoAsync.valueOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundClay,
-      appBar: AppBar(title: const Text('Detalle del Préstamo')),
+      appBar: AppBar(
+        title: const Text('Detalle del Préstamo'),
+        actions: [
+          if (prestamoCargado != null &&
+              prestamoCargado.estado != EstadoPrestamo.pendiente)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Editar interés / capital',
+              onPressed: () => _abrirEditar(context, ref, prestamoCargado),
+            ),
+        ],
+      ),
       body: prestamoAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => ErrorState(

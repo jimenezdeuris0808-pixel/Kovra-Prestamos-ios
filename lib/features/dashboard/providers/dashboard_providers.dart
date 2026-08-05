@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../domain/models/cobros_hoy.dart';
+import '../../../domain/models/cobros_mes.dart';
 import '../../../domain/models/dashboard_resumen.dart';
 
 final dashboardResumenProvider =
@@ -34,6 +35,18 @@ final dashboardCobrosHoyProvider =
   final repo = ref.watch(dashboardRepositoryProvider);
   try {
     return await repo.obtenerCobrosHoy();
+  } catch (e) {
+    throw extractErrorMessage(e);
+  }
+});
+
+/// Capital/interés/mora cobrados en el mes en curso (`GET
+/// /dashboard/cobros_mes`), para la tarjeta "Cobros del mes" del Inicio.
+final dashboardCobrosMesProvider =
+    FutureProvider.autoDispose<CobrosMes>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  try {
+    return await repo.obtenerCobrosMes();
   } catch (e) {
     throw extractErrorMessage(e);
   }

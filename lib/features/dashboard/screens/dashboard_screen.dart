@@ -9,6 +9,7 @@ import '../../../core/theme/clay_decoration.dart';
 import '../../../core/utils/categoria_severidad.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/severidad_mora.dart';
+import '../../../domain/models/cobros_mes.dart';
 import '../../../domain/models/dashboard_resumen.dart';
 import '../../../domain/models/factura.dart';
 import '../../../shared/widgets/clay_card.dart';
@@ -163,6 +164,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                       onLogout: _confirmarLogout,
                     ),
                     const _ResumenGeneralSection(),
+                    const SizedBox(height: AppSpacing.lg),
+                    const _CobrosMesSection(),
                     const SizedBox(height: AppSpacing.lg),
                     PillTabs(
                       controller: _tabController,
@@ -320,6 +323,170 @@ class _ResumenGeneralSection extends ConsumerWidget {
           ),
         ),
         data: (resumen) => _ResumenGeneralContent(resumen: resumen),
+      ),
+    );
+  }
+}
+
+/// Tarjeta "Cobros del mes": capital, interés y mora cobrados en el mes
+/// calendario en curso. Equivalente móvil de "Cobros del mes en vivo" de
+/// Kovra Web (app_web.py::_dash_cobros_mes_vivo) -- mismo criterio de
+/// "reinicio" automático cada 1ro de mes (el backend siempre filtra desde
+/// el inicio del mes de hoy, sin ningún job aparte). Estado de carga/error
+/// independiente del resto del dashboard, mismo patrón que
+/// [_ResumenGeneralSection].
+class _CobrosMesSection extends ConsumerWidget {
+  const _CobrosMesSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cobrosMesAsync = ref.watch(dashboardCobrosMesProvider);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: cobrosMesAsync.when(
+        loading: () => Container(
+          height: 96,
+          alignment: Alignment.center,
+          decoration: ClayDecoration.surface(radius: AppRadii.lg),
+          child: const CircularProgressIndicator(),
+        ),
+        error: (error, _) => ClayCard(
+          child: Row(
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.dangerStrong),
+              const SizedBox(width: AppSpacing.sm),
+              const Expanded(
+                child: Text(
+                  'No se pudo cargar los cobros del mes.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => ref.invalidate(dashboardCobrosMesProvider),
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+        data: (cobros) => _CobrosMesContent(cobros: cobros),
+      ),
+    );
+  }
+}
+
+class _CobrosMesContent extends StatelessWidget {
+  const _CobrosMesContent({required this.cobros});
+
+  final CobrosMes cobros;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClayCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.calendar_month_outlined,
+                  size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              const Text(
+                'COBROS DEL MES',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.6,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                Formatters.currency(cobros.total),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _MiniStat(
+                  label: 'Capital',
+                  value: Formatters.currency(cobros.capital),
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _MiniStat(
+                  label: 'Interés',
+                  value: Formatters.currency(cobros.interes),
+                  color: AppColors.success,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _MiniStat(
+                  label: 'Mora',
+                  value: Formatters.currency(cobros.mora),
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({required this.label, required this.value, required this.color});
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: color == AppColors.warning ? AppColors.textPrimary : color,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

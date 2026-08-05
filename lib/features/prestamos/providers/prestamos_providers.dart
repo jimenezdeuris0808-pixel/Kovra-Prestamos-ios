@@ -4,6 +4,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/providers/core_providers.dart';
 import '../../../data/repositories/prestamos_repository.dart';
 import '../../../domain/models/abono_capital.dart';
+import '../../../domain/models/editar_prestamo.dart';
 import '../../../domain/models/prestamo.dart';
 import '../../../domain/models/prestamo_busqueda_cross_tenant.dart';
 import '../../../domain/models/prestamo_cartera.dart';
@@ -239,4 +240,59 @@ class AbonoCapitalController extends StateNotifier<AbonoCapitalState> {
 final abonoCapitalControllerProvider = StateNotifierProvider.autoDispose<
     AbonoCapitalController, AbonoCapitalState>((ref) {
   return AbonoCapitalController(ref);
+});
+
+class EditarPrestamoState {
+  const EditarPrestamoState({this.isLoading = false, this.errorMessage});
+
+  final bool isLoading;
+  final String? errorMessage;
+
+  EditarPrestamoState copyWith({bool? isLoading, String? errorMessage}) {
+    return EditarPrestamoState(
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage,
+    );
+  }
+}
+
+/// Controlador de "Editar Préstamo" (`PATCH /prestamos/{id}/editar`):
+/// corregir la tasa de interés y/o el capital pendiente de un préstamo ya
+/// creado, en cualquier momento.
+class EditarPrestamoController extends StateNotifier<EditarPrestamoState> {
+  EditarPrestamoController(this._ref) : super(const EditarPrestamoState());
+
+  final Ref _ref;
+
+  Future<EditarPrestamoResultado?> editar({
+    required int prestamoId,
+    double? tasaInteres,
+    double? capitalPendiente,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final repo = _ref.read(prestamosRepositoryProvider);
+      final resultado = await repo.editar(
+        prestamoId: prestamoId,
+        tasaInteres: tasaInteres,
+        capitalPendiente: capitalPendiente,
+      );
+      state = state.copyWith(isLoading: false);
+      return resultado;
+    } on PrestamosException catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      return null;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'No se pudo guardar el cambio. Intenta de nuevo.',
+      );
+      return null;
+    }
+  }
+}
+
+final editarPrestamoControllerProvider = StateNotifierProvider.autoDispose<
+    EditarPrestamoController, EditarPrestamoState>((ref) {
+  return EditarPrestamoController(ref);
 });

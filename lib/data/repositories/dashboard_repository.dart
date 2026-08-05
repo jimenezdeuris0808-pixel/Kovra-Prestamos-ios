@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../domain/models/cobros_hoy.dart';
+import '../../domain/models/cobros_mes.dart';
 import '../../domain/models/dashboard_resumen.dart';
 
 /// Repositorio de dashboard: `GET /dashboard/resumen`,
@@ -51,6 +52,21 @@ class DashboardRepository {
       throw DashboardException(detail);
     }
     return DashboardCobrosHoy.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// `GET /dashboard/cobros_mes` — capital/interés/mora cobrados en el mes
+  /// calendario en curso, para la tarjeta "Cobros del mes" del Inicio.
+  Future<CobrosMes> obtenerCobrosMes() async {
+    final response = await _dio.get('/dashboard/cobros_mes');
+    if (response.statusCode != 200) {
+      final data = response.data;
+      final detail = (data is Map)
+          ? (data['detail']?.toString() ??
+              'No se pudo cargar los cobros del mes.')
+          : 'No se pudo cargar los cobros del mes.';
+      throw DashboardException(detail);
+    }
+    return CobrosMes.fromJson(response.data as Map<String, dynamic>);
   }
 }
 
